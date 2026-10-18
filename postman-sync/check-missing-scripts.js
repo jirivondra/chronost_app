@@ -79,7 +79,6 @@ function findBodyFieldDrift(manifest, generatedDir, collection) {
 function main() {
   const argv = process.argv.slice(2)
   const generatedDir = argFor(argv, '--generated')
-  const scriptsDir = argFor(argv, '--scripts')
   const manifestPath = argFor(argv, '--manifest')
   const currentPath = argFor(argv, '--current')
   const outPath = argFor(argv, '--out')
@@ -89,16 +88,13 @@ function main() {
   const collection = JSON.parse(fs.readFileSync(currentPath, 'utf8'))
 
   const unwiredEndpoints = generatedKeys(generatedDir).filter((key) => !manifestKeys.has(key))
-  const missingScripts = Object.keys(manifest).filter(
-    (key) => !fs.existsSync(path.join(scriptsDir, `${key}.js`))
-  )
   const bodyFieldDrift = findBodyFieldDrift(manifest, generatedDir, collection)
 
   const lines = ['## Postman sync checklist', '']
 
-  if (0 === unwiredEndpoints.length && 0 === missingScripts.length && 0 === bodyFieldDrift.length) {
+  if (0 === unwiredEndpoints.length && 0 === bodyFieldDrift.length) {
     lines.push(
-      'Nothing to review — every endpoint is wired up, has a test script, and its example body fields match the spec.'
+      'Nothing to review — every endpoint is wired up and its example body fields match the spec.'
     )
   } else {
     if (unwiredEndpoints.length > 0) {
@@ -107,11 +103,6 @@ function main() {
         ''
       )
       unwiredEndpoints.forEach((key) => lines.push(`- [ ] \`${key}\``))
-      lines.push('')
-    }
-    if (missingScripts.length > 0) {
-      lines.push('Requests with no test script yet (add `scripts/<key>.js`):', '')
-      missingScripts.forEach((key) => lines.push(`- [ ] \`${key}\``))
       lines.push('')
     }
     if (bodyFieldDrift.length > 0) {
@@ -134,7 +125,7 @@ function main() {
 
   fs.writeFileSync(outPath, `${lines.join('\n')}\n`)
   console.log(
-    `Wrote checklist to ${outPath} (${unwiredEndpoints.length} unwired, ${missingScripts.length} missing scripts, ${bodyFieldDrift.length} body field drift)`
+    `Wrote checklist to ${outPath} (${unwiredEndpoints.length} unwired, ${bodyFieldDrift.length} body field drift)`
   )
 }
 

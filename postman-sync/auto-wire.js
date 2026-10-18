@@ -43,17 +43,9 @@ function findAnyRequestUrl(items) {
   return null
 }
 
-function buildTestScript(successStatus) {
-  if (!successStatus) {
-    return `pm.test('Request succeeds', function () {\n    pm.response.to.be.success;\n});`
-  }
-  return `pm.test('Status code is ${successStatus}', function () {\n    pm.response.to.have.status(${successStatus});\n});`
-}
-
 function main() {
   const argv = process.argv.slice(2)
   const generatedDir = argFor(argv, '--generated')
-  const scriptsDir = argFor(argv, '--scripts')
   const manifestPath = argFor(argv, '--manifest')
   const collectionPath = argFor(argv, '--collection')
   const folderName = argFor(argv, '--folder')
@@ -83,11 +75,6 @@ function main() {
   for (const key of unwiredKeys) {
     const skeleton = JSON.parse(fs.readFileSync(path.join(generatedDir, `${key}.json`), 'utf8'))
 
-    fs.writeFileSync(
-      path.join(scriptsDir, `${key}.js`),
-      `export const test = \`\n${buildTestScript(skeleton._meta?.successStatus)}\n\`\n`
-    )
-
     folder.item.push({
       id: skeleton.id ?? crypto.randomUUID(),
       name: skeleton.name,
@@ -116,7 +103,7 @@ function main() {
   const lines = [
     '## Auto-created endpoints',
     '',
-    `The following ${wired.length} endpoint(s) had no request yet and were added automatically to the "${folderName}" folder, with a minimal generated test (status code only) — review the request and expand its test coverage:`,
+    `The following ${wired.length} endpoint(s) had no request yet and were added automatically to the "${folderName}" folder, without any script — review the request. Its status code is checked by the sync's collection run; add \`scripts/${'<key>'}.js\` only if it produces a value other requests should reuse:`,
     '',
     ...wired.map(({ key, name }) => `- [ ] \`${key}\` ("${name}")`),
   ]

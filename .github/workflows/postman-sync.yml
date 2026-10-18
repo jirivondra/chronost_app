@@ -52,7 +52,6 @@ jobs:
         run: |
           node postman-sync/auto-wire.js \
             --generated postman-sync-tmp/generated \
-            --scripts postman-repo/scripts \
             --manifest postman-repo/sync-manifest.json \
             --collection postman-repo/collections/todo-app.postman_collection.json \
             --folder Todos \
@@ -71,7 +70,6 @@ jobs:
         run: |
           node postman-sync/check-missing-scripts.js \
             --generated postman-sync-tmp/generated \
-            --scripts postman-repo/scripts \
             --manifest postman-repo/sync-manifest.json \
             --current postman-repo/collections/todo-app.postman_collection.json \
             --out missing-scripts.md
@@ -97,8 +95,17 @@ jobs:
         if: always()
         run: kill -INT "$(cat /tmp/api_pid)" 2>/dev/null || true
 
+      # The collection holds no assertions, so this step is what checks each request's status code
+      # (against the spec) and fails on script errors.
       - name: Summarize collection run
-        run: node postman-sync/summarize-newman.js --results newman-results.json --out newman-summary.md
+        id: summary
+        continue-on-error: true
+        run: |
+          node postman-sync/summarize-newman.js \
+            --results newman-results.json \
+            --generated postman-sync-tmp/generated \
+            --manifest postman-repo/sync-manifest.json \
+            --out newman-summary.md
 
       - name: Build PR body
         run: |
@@ -123,7 +130,7 @@ jobs:
             scripts/*.js
 
       - name: Fail if the collection run failed
-        if: steps.newman.outcome == 'failure'
+        if: steps.newman.outcome == 'failure' || steps.summary.outcome == 'failure'
         run: |
           echo "The collection run against the live API failed — see the 'Run collection against the live API' step output and the opened PR."
           exit 1

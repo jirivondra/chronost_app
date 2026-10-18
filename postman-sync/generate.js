@@ -38,7 +38,7 @@ function successStatus(operation) {
 
 // Maps each endpoint's canonical key to its declared success status code (e.g. 201 for Create,
 // 204 for Delete), read directly from the spec rather than guessed — this drives the minimal
-// test script auto-generated for brand-new, not-yet-wired-up endpoints.
+// status-code check summarize-newman.js runs against the collection run's results.
 function successStatusByKey(spec) {
   const byKey = {}
   for (const [specPath, methods] of Object.entries(spec.paths || {})) {
