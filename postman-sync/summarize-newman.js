@@ -10,10 +10,9 @@ function argFor(argv, flag) {
   return argv[index + 1]
 }
 
-// The collection itself holds no pm.test assertions (it's for manual calls only), so the expected
-// status code of each request comes from outside the collection: the spec's declared success code
-// for manifest-mapped requests, or a "(404)"-style suffix in the request name for hand-maintained
-// ones such as the Errors folder. Requests matching neither are reported but not checked.
+// The collection holds no pm.test assertions and only successful calls (it's for manual calls;
+// error cases are tested in Mocha), so each request's expected status is the spec's declared
+// success code for the endpoint it's mapped to in sync-manifest.json.
 function expectedStatusByName(manifest, generatedDir) {
   const byName = new Map()
   for (const [key, name] of Object.entries(manifest)) {
@@ -27,14 +26,6 @@ function expectedStatusByName(manifest, generatedDir) {
     }
   }
   return byName
-}
-
-function expectedStatus(name, byName) {
-  if (byName.has(name)) {
-    return byName.get(name)
-  }
-  const suffix = name.match(/\((\d{3})\)\s*$/)
-  return suffix ? Number(suffix[1]) : null
 }
 
 // Every endpoint of this API answers in JSON, so any response that carries a body must be JSON —
@@ -98,13 +89,16 @@ function main() {
 
   const rows = report.run.executions.map((execution) => {
     const name = execution.item.name
-    const expected = expectedStatus(name, byName)
+    const expected = byName.get(name) ?? null
     const actual = execution.response?.code ?? null
     const problems = []
     if (null === actual) {
       problems.push('no response')
     } else {
-      if (null !== expected && actual !== expected) {
+      if (null === expected) {
+        // A request the spec has no success code for doesn't belong in the collection.
+        problems.push('not mapped to an endpoint in sync-manifest.json')
+      } else if (actual !== expected) {
         problems.push(`expected ${expected}, got ${actual}`)
       }
       const jsonProblem = nonJsonBodyProblem(execution.response)
@@ -117,12 +111,7 @@ function main() {
       problems.push(`unresolved ${unresolved.join(', ')} (variable not set by an earlier request?)`)
     }
 
-    let result = '✅'
-    if (problems.length > 0) {
-      result = `❌ ${problems.join('; ')}`
-    } else if (null === expected) {
-      result = '➖ status not checked'
-    }
+    const result = problems.length > 0 ? `❌ ${problems.join('; ')}` : '✅'
     return { name, expected, actual, result, failed: problems.length > 0 }
   })
 
@@ -133,7 +122,7 @@ function main() {
   const lines = [
     `## Collection run: ${0 === failedCount ? '✅ passed' : `❌ ${failedCount} failed`}`,
     '',
-    `Ran against a live local instance: ${rows.length} request(s). Each request is checked for: the status code from the OpenAPI spec (or the "(NNN)" suffix of its name), a JSON body whenever it has one, and no unresolved \`{{variables}}\`.`,
+    `Ran against a live local instance: ${rows.length} request(s). Each request is checked for: the success status code from the OpenAPI spec, a JSON body whenever it has one, and no unresolved \`{{variables}}\`.`,
     '',
     '| Request | Expected | Actual | Result |',
     '| --- | --- | --- | --- |',

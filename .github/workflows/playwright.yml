@@ -1,98 +1,23 @@
 name: Playwright Regression
 
+# Changes that only touch the Postman sync don't affect the app or its UI — postman-sync.yml checks
+# them (collection run + the same API regression), so skip the E2E run for them.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'postman-sync/**'
+      - '.github/workflows/postman-sync.yml'
   pull_request:
+    paths-ignore:
+      - 'postman-sync/**'
+      - '.github/workflows/postman-sync.yml'
   workflow_dispatch:
 
 jobs:
   api-regression:
-    name: API regression
-    timeout-minutes: 15
-    runs-on: ubuntu-latest
-    env:
-      BASE_URL: http://localhost:8000
-      API_USERNAME: ${{ secrets.API_USERNAME }}
-      API_PASSWORD: ${{ secrets.API_PASSWORD }}
-
-    steps:
-      - name: Checkout app
-        uses: actions/checkout@v4
-
-      - name: Checkout Mocha API tests
-        uses: actions/checkout@v4
-        with:
-          repository: jirivondra/mocha_api_soap_testing
-          path: mocha-api-tests
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install API dependencies
-        run: pip install -r api/requirements.txt
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          registry-url: https://npm.pkg.github.com
-          scope: '@jirivondra'
-
-      - name: Start API
-        run: uvicorn api.main:app --host 0.0.0.0 --port 8000 &
-
-      - name: Wait for API
-        run: |
-          timeout 30 bash -c \
-            'until curl -sf -u "$API_USERNAME:$API_PASSWORD" http://localhost:8000/todos > /dev/null; do sleep 1; done'
-
-      - name: Install dependencies and run Mocha REST regression suite
-        working-directory: mocha-api-tests
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
-        run: |
-          set -o pipefail
-          { npm ci && npm run test:regression; } 2>&1 | tee mocha-output.log
-
-      - name: Upload Mocha output
-        id: upload-output
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: mocha-output
-          path: mocha-api-tests/mocha-output.log
-          retention-days: 30
-
-      - name: Summarize Mocha results
-        if: ${{ !cancelled() }}
-        working-directory: mocha-api-tests
-        env:
-          OUTPUT_URL: ${{ steps.upload-output.outputs.artifact-url }}
-        run: |
-          {
-            echo '### Mocha REST regression'
-            echo
-            if [ -f mocha-output.log ]; then
-              grep -E '^\s+[0-9]+ (passing|failing|pending)' mocha-output.log || true
-              echo
-              echo '<details><summary>Output (last 300 lines)</summary>'
-              echo
-              echo '```'
-              tail -n 300 mocha-output.log
-              echo '```'
-              echo
-              echo '</details>'
-              echo
-              if [ -n "$OUTPUT_URL" ]; then
-                echo "[Download the full output]($OUTPUT_URL)"
-              fi
-            else
-              echo 'No output was produced — see the step logs.'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+    uses: ./.github/workflows/api-regression.yml
+    secrets: inherit
 
   e2e-regression:
     name: E2E regression

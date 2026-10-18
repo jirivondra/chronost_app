@@ -1,15 +1,24 @@
 name: Sync Postman Collection
 
+# On a pull request this only checks the collection (no sync PR is opened); on main it also opens
+# the sync PR. Either way it ends with the Mocha REST regression.
 on:
   push:
     branches: [main]
     paths:
       - 'api/main.py'
       - 'postman-sync/**'
+      - '.github/workflows/postman-sync.yml'
+  pull_request:
+    paths:
+      - 'api/main.py'
+      - 'postman-sync/**'
+      - '.github/workflows/postman-sync.yml'
   workflow_dispatch:
 
 jobs:
   sync:
+    name: Postman collection run
     runs-on: ubuntu-latest
 
     steps:
@@ -107,7 +116,12 @@ jobs:
             --manifest postman-repo/sync-manifest.json \
             --out newman-summary.md
 
+      - name: Publish collection run summary
+        if: ${{ !cancelled() }}
+        run: cat newman-summary.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build PR body
+        if: github.event_name != 'pull_request'
         run: |
           cat auto-wired.md > pr-body.md
           echo "" >> pr-body.md
@@ -116,6 +130,7 @@ jobs:
           cat newman-summary.md >> pr-body.md
 
       - name: Open PR in Postman collection repo
+        if: github.event_name != 'pull_request'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.POSTMAN_REPO_TOKEN }}
@@ -134,5 +149,13 @@ jobs:
       - name: Fail if the collection run failed
         if: steps.newman.outcome == 'failure' || steps.summary.outcome == 'failure'
         run: |
-          echo "The collection run against the live API failed — see the 'Run collection against the live API' step output and the opened PR."
+          echo "The collection run against the live API failed — see this run's summary (and the opened sync PR, on main)."
           exit 1
+
+  # Runs even when the collection run failed: a failing request may well be an API bug, and this
+  # tells the two apart.
+  api-regression:
+    needs: sync
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/api-regression.yml
+    secrets: inherit
