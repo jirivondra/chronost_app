@@ -122,7 +122,9 @@ jobs:
           path: postman-repo
           branch: sync/openapi-update
           commit-message: 'sync: update collection from OpenAPI spec'
-          title: 'Sync Postman collection with API changes'
+          # The PR lives in another repo than this workflow run, so a red run here is easy to miss —
+          # put the outcome right into the title the reviewer sees before merging.
+          title: ${{ (steps.newman.outcome == 'failure' || steps.summary.outcome == 'failure') && '❌ Sync Postman collection with API changes (collection run failed)' || 'Sync Postman collection with API changes' }}
           body-path: pr-body.md
           add-paths: |
             collections/todo-app.postman_collection.json

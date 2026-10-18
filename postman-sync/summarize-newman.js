@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { Buffer } from 'node:buffer'
 
 function argFor(argv, flag) {
   const index = argv.indexOf(flag)
@@ -36,6 +37,54 @@ function expectedStatus(name, byName) {
   return suffix ? Number(suffix[1]) : null
 }
 
+// Every endpoint of this API answers in JSON, so any response that carries a body must be JSON —
+// an HTML error page or plain text means the request hit something other than the API. Bodiless
+// responses (e.g. 204 from Delete) are skipped, even though they still send a JSON Content-Type.
+function nonJsonBodyProblem(response) {
+  const body = Buffer.from(response.stream?.data ?? []).toString('utf8')
+  if ('' === body) {
+    return null
+  }
+  const contentType =
+    response.header?.find((header) => 'content-type' === header.key.toLowerCase())?.value ?? ''
+  if (!contentType.includes('application/json')) {
+    return `Content-Type is "${contentType || 'missing'}", not JSON`
+  }
+  try {
+    JSON.parse(body)
+    return null
+  } catch {
+    return 'body is not valid JSON'
+  }
+}
+
+function decodeUrlPart(part) {
+  try {
+    return decodeURIComponent(part)
+  } catch {
+    return part
+  }
+}
+
+// newman reports the request as actually sent, i.e. after variable substitution — so a
+// "{{name}}" left in it means the variable was never set (e.g. Delete run without Create first).
+// URL parts come URL-encoded ("%7B%7Btodo_id%7D%7D"), so they're decoded before matching.
+function unresolvedVariables(request) {
+  const url = request.url ?? {}
+  const urlParts = [
+    ...(url.host ?? []),
+    ...(url.path ?? []),
+    ...(url.query ?? []).filter((param) => !param.disabled).map((param) => param.value ?? ''),
+  ].map(decodeUrlPart)
+  const parts = [
+    ...urlParts,
+    ...(request.header ?? []).filter((header) => !header.disabled).map((header) => header.value),
+    request.body?.raw ?? '',
+  ]
+  const found = parts.join(' ').match(/\{\{[^}]+\}\}/g) ?? []
+  return [...new Set(found)].map((variable) => `\`${variable}\``)
+}
+
 function main() {
   const argv = process.argv.slice(2)
   const resultsPath = argFor(argv, '--results')
@@ -51,13 +100,30 @@ function main() {
     const name = execution.item.name
     const expected = expectedStatus(name, byName)
     const actual = execution.response?.code ?? null
-    let result = '➖ not checked'
+    const problems = []
     if (null === actual) {
-      result = '❌ no response'
-    } else if (null !== expected) {
-      result = actual === expected ? '✅' : '❌'
+      problems.push('no response')
+    } else {
+      if (null !== expected && actual !== expected) {
+        problems.push(`expected ${expected}, got ${actual}`)
+      }
+      const jsonProblem = nonJsonBodyProblem(execution.response)
+      if (jsonProblem) {
+        problems.push(jsonProblem)
+      }
     }
-    return { name, expected, actual, result, failed: result.startsWith('❌') }
+    const unresolved = unresolvedVariables(execution.request)
+    if (unresolved.length > 0) {
+      problems.push(`unresolved ${unresolved.join(', ')} (variable not set by an earlier request?)`)
+    }
+
+    let result = '✅'
+    if (problems.length > 0) {
+      result = `❌ ${problems.join('; ')}`
+    } else if (null === expected) {
+      result = '➖ status not checked'
+    }
+    return { name, expected, actual, result, failed: problems.length > 0 }
   })
 
   // Script errors (e.g. a pre-request that throws) and any failed pm.test land in run.failures.
@@ -67,7 +133,7 @@ function main() {
   const lines = [
     `## Collection run: ${0 === failedCount ? '✅ passed' : `❌ ${failedCount} failed`}`,
     '',
-    `Ran against a live local instance: ${rows.length} request(s). Status codes are checked against the OpenAPI spec (or the "(NNN)" suffix of the request name).`,
+    `Ran against a live local instance: ${rows.length} request(s). Each request is checked for: the status code from the OpenAPI spec (or the "(NNN)" suffix of its name), a JSON body whenever it has one, and no unresolved \`{{variables}}\`.`,
     '',
     '| Request | Expected | Actual | Result |',
     '| --- | --- | --- | --- |',
