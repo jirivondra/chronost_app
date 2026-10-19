@@ -37,12 +37,17 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Configure GitHub Packages auth
         run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.PACKAGES_TOKEN }}" >> .npmrc
         working-directory: mocha-tests
 
       - name: Install test dependencies
-        run: npm ci
+        run: task ci-install
         working-directory: mocha-tests
 
       - name: Create API .env
@@ -88,7 +93,7 @@ jobs:
         working-directory: mocha-tests
 
       - name: Run Mocha tests
-        run: npm test
+        run: task test
         working-directory: mocha-tests
 
       - name: Stop servers

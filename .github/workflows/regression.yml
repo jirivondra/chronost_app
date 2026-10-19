@@ -1,4 +1,4 @@
-name: Playwright Regression
+name: Regression
 
 on:
   push:
@@ -41,6 +41,11 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: '@jirivondra'
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Start API
         run: uvicorn api.main:app --host 0.0.0.0 --port 8000 &
 
@@ -55,7 +60,11 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
         run: |
           set -o pipefail
-          { npm ci && npm run test:regression; } 2>&1 | tee mocha-output.log
+          { task ci-install && task test-regression; } 2>&1 | tee mocha-output.log
+
+      - name: Check schema is in sync with /openapi.json
+        working-directory: mocha-api-tests
+        run: task check-schema-drift
 
       - name: Upload Mocha output
         id: upload-output
