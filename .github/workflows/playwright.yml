@@ -41,6 +41,11 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: '@jirivondra'
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Start API
         run: uvicorn api.main:app --host 0.0.0.0 --port 8000 &
 
@@ -55,7 +60,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
         run: |
           set -o pipefail
-          { npm ci && npm run test:regression; } 2>&1 | tee mocha-output.log
+          { npm ci && task test-regression; } 2>&1 | tee mocha-output.log
 
       - name: Upload Mocha output
         id: upload-output
