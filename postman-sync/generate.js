@@ -74,6 +74,41 @@ function queryParamsByKey(spec) {
   return byKey
 }
 
+// The value a query param gets in the skeleton: the spec's example, else its default, else empty.
+// Without this, openapi-to-postmanv2 makes one up — a random number/boolean on every run — which
+// showed up as a meaningless diff in every sync PR even when the API hadn't changed.
+function queryParamValue(param) {
+  const namedExample = Object.values(param.examples || {})[0]?.value
+  const value = param.example ?? param.schema?.example ?? namedExample ?? param.schema?.default
+  return value === undefined || value === null ? '' : String(value)
+}
+
+function queryValuesByKey(spec) {
+  const byKey = {}
+  for (const [specPath, methods] of Object.entries(spec.paths || {})) {
+    for (const [method, operation] of Object.entries(methods)) {
+      const key = canonicalKey(method, specPathSegments(specPath))
+      const queryParams = (operation.parameters || []).filter((param) => param.in === 'query')
+      byKey[key] = Object.fromEntries(
+        queryParams.map((param) => [param.name, queryParamValue(param)])
+      )
+    }
+  }
+  return byKey
+}
+
+function withStableQueryValues(url, values) {
+  if (!url?.query) {
+    return url
+  }
+  return {
+    ...url,
+    query: url.query.map((param) =>
+      param.key in values ? { ...param, value: values[param.key] } : param
+    ),
+  }
+}
+
 function main() {
   const argv = process.argv.slice(2)
   const specPath = argFor(argv, '--spec')
@@ -82,6 +117,7 @@ function main() {
   const parsedSpec = JSON.parse(specData)
   const statusByKey = successStatusByKey(parsedSpec)
   const queryParamsByKeyMap = queryParamsByKey(parsedSpec)
+  const queryValuesByKeyMap = queryValuesByKey(parsedSpec)
 
   // Prefer the OpenAPI schema `example` (set via Pydantic model_config in api/main.py) over
   // generic type placeholders like "<string>", so a freshly wired-up request is directly usable.
@@ -106,8 +142,20 @@ function main() {
     fs.mkdirSync(outDir, { recursive: true })
     for (const request of requests) {
       const key = canonicalKey(request.request.method, request.request.url.path)
+      const queryValues = queryValuesByKeyMap[key] ?? {}
       const skeleton = {
         ...request,
+        request: {
+          ...request.request,
+          url: withStableQueryValues(request.request.url, queryValues),
+        },
+        response: (request.response || []).map((response) => ({
+          ...response,
+          originalRequest: {
+            ...response.originalRequest,
+            url: withStableQueryValues(response.originalRequest?.url, queryValues),
+          },
+        })),
         _meta: {
           successStatus: statusByKey[key] ?? null,
           queryParamsWithExample: queryParamsByKeyMap[key] ?? {},

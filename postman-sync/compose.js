@@ -34,6 +34,36 @@ async function loadScript(scriptsDir, key) {
   return import(pathToFileURL(scriptPath).href)
 }
 
+// The spec's response examples (e.g. "Successful Response" with the Todo example body), saved on
+// the request so Postman shows what the endpoint returns. Their originalRequest URL is rebuilt with
+// this collection's host/path convention, same as the request itself.
+function buildResponses(skeleton, currentUrl) {
+  return (skeleton.response || []).map((response) => {
+    const originalRequest = response.originalRequest || {}
+    const hasBody = originalRequest.body && Object.keys(originalRequest.body).length > 0
+    return {
+      name: response.name,
+      originalRequest: {
+        method: originalRequest.method ?? skeleton.request.method,
+        header: originalRequest.header ?? [],
+        ...(hasBody ? { body: originalRequest.body } : {}),
+        url: buildUrl(
+          currentUrl,
+          originalRequest.url?.path ?? skeleton.request.url.path,
+          originalRequest.url?.query,
+          skeleton._meta?.queryParamsWithExample
+        ),
+      },
+      status: response.status,
+      code: response.code,
+      _postman_previewlanguage: response._postman_previewlanguage,
+      header: response.header ?? [],
+      cookie: [],
+      body: response.body ?? '',
+    }
+  })
+}
+
 function walkAndSync(items, reverseManifest, generatedDir, scriptModules, warnings) {
   for (const item of items) {
     if (item.item) {
@@ -72,7 +102,15 @@ function walkAndSync(items, reverseManifest, generatedDir, scriptModules, warnin
     if (scriptModule?.test) {
       events.push(buildEvent('test', scriptModule.test))
     }
-    item.event = events
+    // Only write `event` when there's a script — an empty array on every script-less request was
+    // pure diff noise in each sync PR.
+    if (events.length > 0) {
+      item.event = events
+    } else {
+      delete item.event
+    }
+
+    item.response = buildResponses(skeleton, item.request.url)
   }
 }
 
