@@ -72,7 +72,7 @@ The `dark` class is set by an inline `<script>` in `<head>`, before the Tailwind
 
 ## Testing
 
-- API integration tests live in a separate repo: [Chronos_App_Api_Testing](https://github.com/jirivondra/Chronos_App_Api_Testing).
+- API integration tests (REST + SOAP, Mocha) live in a separate repo: [mocha_rest_soap_testing](https://github.com/jirivondra/mocha_rest_soap_testing) (the workflows still check it out under its old name `mocha_api_soap_testing`, which GitHub redirects).
 - E2E/UI tests live in a separate repo: [Chronos_Playwright_testing](https://github.com/jirivondra/Chronos_Playwright_testing).
 - CI (`.github/workflows/`) checks out these external repos to run tests and upload coverage/reports.
 - `playwright.yml` runs two chained jobs: the Mocha REST regression suite (`api-regression`), then the full Playwright suite (`e2e-regression`, all browsers, visual tests included) — only if the API job passed. Each job writes a results summary to the run page and uploads its output as an artifact (`mocha-output`, `playwright-report`; 30 days).
