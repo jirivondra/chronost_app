@@ -47,7 +47,7 @@ jobs:
         working-directory: mocha-tests
 
       - name: Install test dependencies
-        run: npm ci
+        run: task ci-install
         working-directory: mocha-tests
 
       - name: Create API .env

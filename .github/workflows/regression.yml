@@ -60,7 +60,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
         run: |
           set -o pipefail
-          { npm ci && task test-regression; } 2>&1 | tee mocha-output.log
+          { task ci-install && task test-regression; } 2>&1 | tee mocha-output.log
 
       - name: Check schema is in sync with /openapi.json
         working-directory: mocha-api-tests
