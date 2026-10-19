@@ -25,6 +25,7 @@ Whenever a change that touches `api/main.py` is pushed or merged to `main`:
    gh pr list -R jirivondra/chronos_postman_colection --state open --json number,title,url
    ```
 3. Hand the user **both** links together, unprompted — the Chronost_App PR and the `chronos_postman_colection` sync PR. Don't wait to be asked; that defeats the point.
+   - **Always** also print the URL where the sync PR lives, so the user knows where to look even if the specific PR can't be linked yet (the workflow is still running, or it hasn't opened the PR): <https://github.com/jirivondra/chronos_postman_colection/pulls>. Never end the hand-off with just "a sync PR will be opened" and no URL.
 4. If the workflow run itself failed even though the PR opened, say so. The PR body's "Collection run" section names which requests failed and why — read that (or the workflow run's logs) before reporting it, don't just flag it as a black box.
 
 A change that doesn't touch `api/main.py` (frontend HTML, `api/soap_calculator.py`, CI workflow files, test repos, etc.) never triggers this — no need to check.
