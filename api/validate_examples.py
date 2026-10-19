@@ -4,10 +4,10 @@ import sys
 os.environ.setdefault("API_USERNAME", "ci")
 os.environ.setdefault("API_PASSWORD", "ci")
 
-from main import TodoCreate, TodoUpdate
+from main import Todo, TodoCreate, TodoUpdate
 
 errors = []
-for model in (TodoCreate, TodoUpdate):
+for model in (TodoCreate, TodoUpdate, Todo):
     example = model.model_config["json_schema_extra"]["example"]
     try:
         model.model_validate(example)
