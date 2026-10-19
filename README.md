@@ -188,7 +188,7 @@ All endpoints require authentication.
 
 | Type      | Tool       | Repository                                                                             |
 | --------- | ---------- | -------------------------------------------------------------------------------------- |
-| API tests | Jest       | [Chronos_App_Api_Testing](https://github.com/jirivondra/Chronos_App_Api_Testing)       |
+| API tests | Mocha      | [mocha_rest_soap_testing](https://github.com/jirivondra/mocha_rest_soap_testing)       |
 | E2E tests | Playwright | [Chronos_Playwright_testing](https://github.com/jirivondra/Chronos_Playwright_testing) |
 | Manual    | Postman    | [chronos_postman_colection](https://github.com/jirivondra/chronos_postman_colection)   |
 
