@@ -32,13 +32,25 @@ If the live collection run fails, the PR still opens (so the diff is visible), b
 
 ## Files
 
-- `generate.js` — converts the exported OpenAPI spec into one skeleton request per endpoint (`<method>_<path>.json`), using the spec's `example` values (set via `model_config` on the Pydantic models in `api/main.py`) so a freshly wired-up request is directly usable, not full of `<string>` placeholders. Also reads each operation's declared success status code (e.g. `201` for Create, `204` for Delete) straight from the spec and attaches it as `_meta.successStatus`.
+- `generate.js` — converts the exported OpenAPI spec into one skeleton request per endpoint (`<method>_<path>.json`), using the spec's `example` values (set via `model_config` on the Pydantic models in `api/main.py`) so a freshly wired-up request is directly usable, not full of `<string>` placeholders. Query param values are made deterministic (spec example, else its default, else empty) — otherwise `openapi-to-postmanv2` invents a random value on every run, which used to show up as a meaningless diff in every sync PR. Also reads each operation's declared success status code (e.g. `201` for Create, `204` for Delete) straight from the spec and attaches it as `_meta.successStatus`.
 - `auto-wire.js` — for every endpoint `generate.js` produced that has **no** entry in the target repo's `sync-manifest.json` yet (a brand-new endpoint), automatically: writes a minimal `scripts/<key>.js` asserting the spec's declared status code, inserts a new request into the `Todos` folder (built from the skeleton, so it already has a realistic example body), and adds the `key -> name` mapping to `sync-manifest.json`. This only ever _creates_ — it never touches an existing manifest entry, request, or script, so the "never overwrite hand-written content" rule for existing endpoints still holds.
-- `compose.js` — for each request name listed in `sync-manifest.json` (including ones `auto-wire.js` just added), syncs only `method` and the URL's path segments (translated into this collection's `{{param}}`-in-path convention) from the matching skeleton, and re-attaches the `prerequest`/`test` scripts from `scripts/<key>.js`. Everything else — `header`, `body`, and any request/folder not listed in the manifest — is left untouched.
+- `compose.js` — for each request name listed in `sync-manifest.json` (including ones `auto-wire.js` just added), syncs `method`, the URL's path segments (translated into this collection's `{{param}}`-in-path convention) and query params (with their spec descriptions) from the matching skeleton, replaces the request's saved response examples with the spec's (e.g. "Successful Response" with the model's example body), and re-attaches the `prerequest`/`test` scripts from `scripts/<key>.js` (no `event` key at all when there is no script). Everything else — `header`, `body`, the request description, and any request/folder not listed in the manifest — is left untouched.
 - `check-missing-scripts.js` — flags endpoints with no manifest entry yet (a fallback, in case `auto-wire.js` couldn't wire one up), no script file yet, or whose example `body` fields have drifted from the spec's; the result becomes part of the PR body. It never changes `body` itself, since a field being "missing" can be intentional (e.g. a partial-update example) — a human always decides.
 - `summarize-newman.js` — turns the JSON report from running the composed collection (via `newman`) against a live local instance of the API into a short pass/fail summary, appended to the PR body. This is the one check that verifies the collection actually _behaves_ correctly, not just that its shape matches the spec.
 - `build-url.js` / `canonical-key.js` — shared helpers (URL construction and `<method>_<path>` key derivation) used by `generate.js`, `compose.js`, and `auto-wire.js`.
 - `../api/validate_examples.py` — validates that the `example` on `TodoCreate`/`TodoUpdate` still passes the model's own validation, so `generate.js`'s output can't silently drift into an invalid example.
+
+## Changing an existing endpoint
+
+The workflow runs on **any** change to `api/main.py`, not just new endpoints. For an endpoint that's already in the collection, the sync PR picks up:
+
+- a new/removed/renamed query param (e.g. a new filter) — added to the request and its saved examples, with the description from `Query(..., description=...)`; it's added disabled unless the spec gives it an example
+- a changed response shape — the saved response examples are regenerated from the response model's `example`
+- a changed method or path
+
+A changed request body is **not** rewritten (a partial example can be intentional) — it's listed in the PR body's checklist as body field drift instead, for a human to decide. The request's free-text description is also hand-maintained; update it in the sync PR if it lists the params.
+
+Re-running the sync with no API change produces no diff, so a sync PR always means something actually changed.
 
 ## Adding a new endpoint
 

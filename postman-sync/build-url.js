@@ -10,6 +10,8 @@
 // "string"), so leaving it enabled would silently send that placeholder; instead it's added
 // disabled, same convention as hand-maintained runtime-only params like `cursor` on Get Next
 // Page (see chronos_postman_colection's README, "Query Parameters Without Example Data").
+// The param's spec description is carried over too, so a new/changed filter on an existing
+// endpoint shows up documented in Postman, not just as a bare key.
 export function buildUrl(
   currentUrl,
   skeletonPathSegments,
@@ -24,6 +26,7 @@ export function buildUrl(
     key: param.key,
     value: param.value,
     disabled: !queryParamsWithExample[param.key],
+    ...(param.description ? { description: param.description } : {}),
   }))
   const queryString = query
     .filter((param) => !param.disabled)
