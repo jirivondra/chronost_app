@@ -38,7 +38,7 @@ If the live collection run fails, the PR still opens (so the diff is visible), b
 - `check-missing-scripts.js` — flags endpoints with no manifest entry yet (a fallback, in case `auto-wire.js` couldn't wire one up), no script file yet, or whose example `body` fields have drifted from the spec's; the result becomes part of the PR body. It never changes `body` itself, since a field being "missing" can be intentional (e.g. a partial-update example) — a human always decides.
 - `summarize-newman.js` — turns the JSON report from running the composed collection (via `newman`) against a live local instance of the API into a short pass/fail summary, appended to the PR body. This is the one check that verifies the collection actually _behaves_ correctly, not just that its shape matches the spec.
 - `build-url.js` / `canonical-key.js` — shared helpers (URL construction and `<method>_<path>` key derivation) used by `generate.js`, `compose.js`, and `auto-wire.js`.
-- `../api/validate_examples.py` — validates that the `example` on `TodoCreate`/`TodoUpdate` still passes the model's own validation, so `generate.js`'s output can't silently drift into an invalid example.
+- `../api/validate_examples.py` — validates that the `example` on `TodoCreate`/`TodoUpdate`/`Todo` still passes the model's own validation, so `generate.js`'s output can't silently drift into an invalid example.
 
 ## Adding a new endpoint
 

@@ -69,6 +69,22 @@ class TodoCreate(BaseModel):
     due_date: Optional[str] = None
 
 
+class Todo(TodoCreate):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": 1,
+                "title": "Buy groceries",
+                "description": "Milk, eggs, bread",
+                "completed": False,
+                "due_date": "2026-07-20",
+            }
+        }
+    )
+
+    id: int
+
+
 class TodoUpdate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
@@ -113,7 +129,7 @@ def get_openapi_schema(_=Depends(authenticate)):
     return get_openapi(title=app.title, version=app.version, routes=app.routes)
 
 
-@app.get("/todos", summary="Get all TODOs")
+@app.get("/todos", response_model=list[Todo], summary="Get all TODOs")
 def get_todos(
     response: Response,
     order: str = Query("desc", pattern="^(asc|desc)$", description="Sort order by id"),
@@ -134,7 +150,7 @@ def get_todos(
     return items
 
 
-@app.post("/todos", status_code=201, summary="Create a TODO")
+@app.post("/todos", status_code=201, response_model=Todo, summary="Create a TODO")
 def create_todo(todo: TodoCreate, _=Depends(authenticate)):
     todos = load_db()
     new_id = next_id(todos)
@@ -144,7 +160,7 @@ def create_todo(todo: TodoCreate, _=Depends(authenticate)):
     return item
 
 
-@app.get("/todos/overdue", summary="Get overdue TODOs")
+@app.get("/todos/overdue", response_model=list[Todo], summary="Get overdue TODOs")
 def get_overdue_todos(_=Depends(authenticate)):
     today = date.today().isoformat()
     overdue = [
@@ -155,7 +171,7 @@ def get_overdue_todos(_=Depends(authenticate)):
     return sorted(overdue, key=lambda t: t["due_date"])
 
 
-@app.get("/todos/{todo_id}", summary="Get a TODO by ID")
+@app.get("/todos/{todo_id}", response_model=Todo, summary="Get a TODO by ID")
 def get_todo(todo_id: int, _=Depends(authenticate)):
     todos = load_db()
     if todo_id not in todos:
@@ -163,7 +179,7 @@ def get_todo(todo_id: int, _=Depends(authenticate)):
     return todos[todo_id]
 
 
-@app.put("/todos/{todo_id}", summary="Update a TODO")
+@app.put("/todos/{todo_id}", response_model=Todo, summary="Update a TODO")
 def update_todo(todo_id: int, todo: TodoUpdate, _=Depends(authenticate)):
     todos = load_db()
     if todo_id not in todos:
