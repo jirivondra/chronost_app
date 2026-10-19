@@ -62,6 +62,10 @@ jobs:
           set -o pipefail
           { npm ci && task test-regression; } 2>&1 | tee mocha-output.log
 
+      - name: Check schema is in sync with /openapi.json
+        working-directory: mocha-api-tests
+        run: task check-schema-drift
+
       - name: Upload Mocha output
         id: upload-output
         if: ${{ !cancelled() }}
