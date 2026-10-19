@@ -70,7 +70,10 @@ class TodoCreate(BaseModel):
 
 
 class Todo(TodoCreate):
+    # Responses always include every field (defaults are filled in), so mark them all
+    # required in the OpenAPI output schema rather than just the ones without defaults.
     model_config = ConfigDict(
+        json_schema_serialization_defaults_required=True,
         json_schema_extra={
             "example": {
                 "id": 1,
